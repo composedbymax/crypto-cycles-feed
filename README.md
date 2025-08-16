@@ -1,6 +1,6 @@
 # Crypto Cycles Feed
 
-A Python script to send cryptocurrency price data to the **[Cycles App](https://app.cycles.org)** API from [CoinGecko](https://www.coingecko.com/en/api), supporting both continuous monitoring and single-test modes.
+A Python script to send cryptocurrency price data to the **[Cycles App](https://app.cycles.org)** from [CoinGecko](https://www.coingecko.com/en/api), supporting both continuous monitoring and single-test modes.
 
 ---
 
@@ -21,19 +21,34 @@ A Python script to send cryptocurrency price data to the **[Cycles App](https://
 
 ---
 
-##  Usage
+## Usage
 
-### Preview what stream IDs will be generated (recommended first)
+### Command Line Options
+
 ```bash
-python crypto_cycles.py --preview
+python crypto_cycles.py                 # Start
+python crypto_cycles.py --5m            # Run continuously every 5 minutes
+python crypto_cycles.py --1h            # Run continuously every 1 hour
+python crypto_cycles.py --test          # Run once for testing
+python crypto_cycles.py --preview       # Preview stream mappings
 ```
 
-### Continuous Monitoring
-```bash
-python crypto_cycles.py
-```
+### Valid Timeframes
+- `--2m` - Every 2 minutes
+- `--5m` - Every 5 minutes
+- `--15m` - Every 15 minutes
+- `--30m` - Every 30 minutes
+- `--1h` - Every 1 hour
+- `--2h` - Every 2 hours
+- `--4h` - Every 4 hours
+- `--6h` - Every 6 hours
+- `--12h` - Every 12 hours
+- `--1d` - Every 1 day
 
-## Single Test Run
-```bash
-python crypto_cycles.py --test
-```
+### Interactive Mode
+When run without arguments, the script will prompt you to choose a mode:
+- **(c)ontinuous** - Run continuously with specified interval
+- **(t)est** - Run once for testing
+- **(p)review** - Preview stream mappings without sending data
+
+---

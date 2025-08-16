@@ -10,11 +10,60 @@ import urllib.request
 import urllib.parse
 from datetime import datetime
 import sys
+import re
 
 # Configuration - Update these values
 CYCLES_API_KEY = "REDACTED"  # Replace with your actual API key
 CYCLES_WEBHOOK_URL = "https://api.cycle.tools/api/Stream/SubmitStreamData"
 COINGECKO_API_URL = "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=10&page=1&sparkline=false"
+
+def parse_timeframe(timeframe_str):
+    """
+    Parse timeframe string like '2m', '5m', '1h', '1d' into seconds
+    Returns tuple (seconds, display_name)
+    """
+    if not timeframe_str:
+        return None, None
+    
+    # Remove leading dashes if present
+    timeframe_str = timeframe_str.lstrip('-')
+    
+    # Match pattern like '2m', '15m', '1h', '4h', '1d'
+    match = re.match(r'^(\d+)([smhd])$', timeframe_str.lower())
+    if not match:
+        return None, None
+    
+    value = int(match.group(1))
+    unit = match.group(2)
+    
+    # Convert to seconds
+    multipliers = {
+        's': 1,      # seconds
+        'm': 60,     # minutes
+        'h': 3600,   # hours
+        'd': 86400   # days
+    }
+    
+    if unit not in multipliers:
+        return None, None
+    
+    seconds = value * multipliers[unit]
+    
+    # Minimum timeframe is 2 minutes (120 seconds) due to API rate limits
+    if seconds < 120:
+        return None, None
+    
+    # Create display name
+    unit_names = {
+        's': 'second' if value == 1 else 'seconds',
+        'm': 'minute' if value == 1 else 'minutes',
+        'h': 'hour' if value == 1 else 'hours',
+        'd': 'day' if value == 1 else 'days'
+    }
+    
+    display_name = f"{value} {unit_names[unit]}"
+    
+    return seconds, display_name
 
 def generate_stream_id(symbol, name):
     """Generate a stream ID from symbol and name"""
@@ -140,10 +189,10 @@ def preview_stream_mappings():
     
     print("-" * 60)
 
-def run_continuous():
-    """Run the app continuously with rate limiting"""
+def run_continuous(interval_seconds=120, interval_display="2 minutes"):
+    """Run the app continuously with configurable interval"""
     print("Starting Crypto Price Monitor...")
-    print("Will update prices every 2 minutes (respecting API rate limits)")
+    print(f"Will update prices every {interval_display}")
     print("Press Ctrl+C to stop")
     
     if not validate_config():
@@ -172,9 +221,9 @@ def run_continuous():
             if process_crypto_data():
                 request_count += 1
             
-            # Wait 2 minutes before next update
-            print(f"Waiting 2 minutes... (Request {request_count}/25 this minute)")
-            time.sleep(120)  # 2 minutes
+            # Wait for specified interval before next update
+            print(f"Waiting {interval_display}... (Request {request_count}/25 this minute)")
+            time.sleep(interval_seconds)
             
     except KeyboardInterrupt:
         print("\nStopping Crypto Price Monitor...")
@@ -199,26 +248,61 @@ def main():
     print("  CRYPTOCURRENCY PRICE TO CYCLES APP")
     print("=" * 50)
     
-    if len(sys.argv) > 1:
-        if sys.argv[1] == "--test":
+    # Parse command line arguments for timeframe
+    interval_seconds = 120  # Default 2 minutes
+    interval_display = "2 minutes"
+    
+    # Look for timeframe flags in arguments
+    timeframe_arg = None
+    other_args = []
+    
+    for arg in sys.argv[1:]:
+        if arg.startswith('--') and re.match(r'^--\d+[smhd]$', arg):
+            timeframe_arg = arg
+        else:
+            other_args.append(arg)
+    
+    # Parse timeframe if provided
+    if timeframe_arg:
+        parsed_seconds, parsed_display = parse_timeframe(timeframe_arg)
+        if parsed_seconds is not None:
+            interval_seconds = parsed_seconds
+            interval_display = parsed_display
+            print(f"✓ Using custom timeframe: {interval_display}")
+        else:
+            print(f"✗ Invalid timeframe: {timeframe_arg}")
+            print("Valid examples: --2m, --5m, --15m, --1h, --4h, --1d")
+            print("Minimum interval is 2 minutes (--2m)")
+            return
+    
+    # Handle other command line arguments
+    if other_args:
+        if other_args[0] == "--test":
             run_once()
-        elif sys.argv[1] == "--preview":
+        elif other_args[0] == "--preview":
             preview_stream_mappings()
         else:
             print("Unknown argument. Use --test or --preview")
     else:
-        print("\nModes:")
-        print("  python crypto_cycles.py           - Run continuously")
-        print("  python crypto_cycles.py --test    - Run once for testing")
-        print("  python crypto_cycles.py --preview - Preview stream mappings")
-        
-        choice = input("\nChoose mode (c)ontinuous/(t)est/(p)review: ").strip().lower()
-        if choice in ['c', 'continuous']:
-            run_continuous()
-        elif choice in ['p', 'preview']:
-            preview_stream_mappings()
+        if len(sys.argv) == 1:  # No arguments provided
+            print("\nModes:")
+            print("  python crypto_cycles.py                    - Run continuously (2 minute default)")
+            print("  python crypto_cycles.py --5m               - Run continuously every 5 minutes")
+            print("  python crypto_cycles.py --1h               - Run continuously every 1 hour")
+            print("  python crypto_cycles.py --test             - Run once for testing")
+            print("  python crypto_cycles.py --preview          - Preview stream mappings")
+            print("\nValid timeframes: --2m, --5m, --15m, --30m, --1h, --2h, --4h, --6h, --12h, --1d")
+            
+            choice = input("\nChoose mode (c)ontinuous/(t)est/(p)review: ").strip().lower()
+            if choice in ['c', 'continuous']:
+                run_continuous(interval_seconds, interval_display)
+            elif choice in ['p', 'preview']:
+                preview_stream_mappings()
+            else:
+                run_once()
         else:
-            run_once()
+            # Run continuous with custom timeframe
+            run_continuous(interval_seconds, interval_display)
 
 if __name__ == "__main__":
     main()
