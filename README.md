@@ -6,18 +6,19 @@ A Python script to send cryptocurrency price data to the **[Cycles App](https://
 
 ## Setup
 
-1. **Save the Script**  
+1. **Setup Script**  
 
-    Save the code as:  
+    Save code and enviorment file as:  
     ```bash
     crypto_cycles.py
+    .env
     ```
 
 2. **Configure Your API Key**  
 
-    Open `crypto_cycles.py` and update the configuration at the top:  
+    Open `.env` and provide key such as:  
     ```python
-    CYCLES_API_KEY = "your-actual-api-key-here"
+    CYCLES_API_KEY=your-actual-api-key-here
     ```
 
 ---

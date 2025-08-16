@@ -13,10 +13,26 @@ from datetime import datetime
 import sys
 import re
 
-# Configuration - Update these values
-CYCLES_API_KEY = "REDACTED"  # Replace with your actual API key
+
+# Simple API key loader from .env file (no extra libraries)
+CYCLES_API_KEY = None
+
+try:
+    with open(".env", "r") as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith("CYCLES_API_KEY="):
+                CYCLES_API_KEY = line.split("=", 1)[1].strip()
+                break
+except FileNotFoundError:
+    print(".env file not found!")
+
+if not CYCLES_API_KEY:
+    print("CYCLES_API_KEY not set! Please add it to .env")
+
+
 CYCLES_WEBHOOK_URL = "https://api.cycle.tools/api/Stream/SubmitStreamData"
-COINGECKO_API_URL = "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false"
+COINGECKO_API_URL = "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=10&page=1&sparkline=false"
 
 def parse_timeframe(timeframe_str):
     """
@@ -26,7 +42,6 @@ def parse_timeframe(timeframe_str):
     if not timeframe_str:
         return None, None
     
-    # Remove leading dashes if present
     timeframe_str = timeframe_str.lstrip('-')
     
     # Match pattern like '2m', '15m', '1h', '4h', '1d'
@@ -37,7 +52,6 @@ def parse_timeframe(timeframe_str):
     value = int(match.group(1))
     unit = match.group(2)
     
-    # Convert to seconds
     multipliers = {
         's': 1,      # seconds
         'm': 60,     # minutes
@@ -54,7 +68,6 @@ def parse_timeframe(timeframe_str):
     if seconds < 120:
         return None, None
     
-    # Create display name
     unit_names = {
         's': 'second' if value == 1 else 'seconds',
         'm': 'minute' if value == 1 else 'minutes',
@@ -86,7 +99,7 @@ def parse_symbols(symbol_args):
 
 def generate_stream_id(symbol, name):
     """Generate a stream ID from symbol and name"""
-    # Convert symbol to uppercase and append _PRICE
+    # Convert symbol to uppercase and append _PRICE for cycle app symbol
     return f"{symbol.upper()}_PRICE"
 
 def fetch_crypto_prices():
@@ -106,7 +119,6 @@ def fetch_crypto_prices():
 def send_to_cycles(stream_id, price, timestamp):
     """Send price data to Cycles app"""
     try:
-        # Prepare the payload
         payload = {
             "streamid": stream_id,
             "messagetype": "UPSERT",
@@ -114,7 +126,6 @@ def send_to_cycles(stream_id, price, timestamp):
             "values": [price]
         }
         
-        # Prepare the request
         url_with_key = f"{CYCLES_WEBHOOK_URL}?api_key={CYCLES_API_KEY}"
         data = json.dumps(payload).encode('utf-8')
         
@@ -124,7 +135,7 @@ def send_to_cycles(stream_id, price, timestamp):
             headers={'Content-Type': 'application/json'}
         )
         
-        # Send the request
+        # Send
         with urllib.request.urlopen(req) as response:
             if response.status == 200:
                 print(f"✓ Sent {stream_id}: ${price}")
@@ -154,7 +165,7 @@ def filter_cryptos_by_symbols(crypto_data, target_symbols):
     # Report missing symbols
     missing_symbols = target_symbols - found_symbols
     if missing_symbols:
-        print(f"⚠️  Symbols not found in API data: {', '.join(sorted(missing_symbols))}")
+        print(f"Symbols not found in API data: {', '.join(sorted(missing_symbols))}")
     
     if found_symbols:
         print(f"✓ Found symbols: {', '.join(sorted(found_symbols))}")
@@ -165,12 +176,10 @@ def process_crypto_data(target_symbols=None):
     """Main processing function with optional symbol filtering"""
     print(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Fetching crypto prices...")
     
-    # Fetch data from CoinGecko
     crypto_data = fetch_crypto_prices()
     if not crypto_data:
         return False
     
-    # Filter by symbols if specified
     if target_symbols:
         print(f"Filtering for symbols: {', '.join(sorted(target_symbols))}")
         crypto_data = filter_cryptos_by_symbols(crypto_data, target_symbols)
@@ -195,7 +204,7 @@ def process_crypto_data(target_symbols=None):
         current_price = crypto.get('current_price')
         
         if symbol and current_price and name:
-            # Generate stream ID automatically
+            # Generate stream ID automatically via Coinbase data
             stream_id = generate_stream_id(symbol, name)
             total_count += 1
             
@@ -250,16 +259,19 @@ def preview_stream_mappings(target_symbols=None):
     
     print("-" * 60)
 
-def run_continuous(interval_seconds=120, interval_display="2 minutes", target_symbols=None):
-    """Run the app continuously with configurable interval"""
-    print("Starting Crypto Price Monitor...")
+def run_continuous(interval_seconds=120, target_symbols=None):
+    """Run the Crypto Price Monitor continuously with rate-limit handling."""
+    
+    interval_display = f"{interval_seconds // 60} minutes" if interval_seconds >= 60 else f"{interval_seconds} seconds"
+    
+    print("🚀 Starting Crypto Price Monitor...")
     
     if target_symbols:
         print(f"Monitoring specific symbols: {', '.join(sorted(target_symbols))}")
     else:
         print("Monitoring all top cryptocurrencies")
         
-    print(f"Will update prices every {interval_display}")
+    print(f"Updating prices every {interval_display}")
     print("Press Ctrl+C to stop")
     
     if not validate_config():
@@ -270,32 +282,33 @@ def run_continuous(interval_seconds=120, interval_display="2 minutes", target_sy
     
     try:
         while True:
-            # Check rate limits (30 requests per minute, 10k per month)
             current_time = time.time()
             elapsed_minutes = (current_time - start_time) / 60
             
-            if elapsed_minutes >= 1:  # Reset counter every minute
+            # Reset request counter every minute
+            if elapsed_minutes >= 1:
                 request_count = 0
                 start_time = current_time
             
-            if request_count >= 25:  # Stay under 30/minute limit
-                print("⏸️  Rate limit approaching, waiting...")
+            # Check rate limit
+            if request_count >= 25:
+                print("⏸️  Approaching rate limit, pausing for 60 seconds...")
                 time.sleep(60)
                 request_count = 0
                 start_time = time.time()
+                continue  # Skip to next iteration
             
             # Process crypto data
             if process_crypto_data(target_symbols):
                 request_count += 1
             
-            # Wait for specified interval before next update
-            print(f"Waiting {interval_display}... (Request {request_count}/25 this minute)")
+            print(f"⏱ Waiting {interval_display}... (Requests this minute: {request_count}/25)")
             time.sleep(interval_seconds)
             
     except KeyboardInterrupt:
-        print("\nStopping Crypto Price Monitor...")
+        print("\n🛑 Stopping Crypto Price Monitor...")
         print("✓ Shutdown complete")
-
+        
 def run_once(target_symbols=None):
     """Run once for testing"""
     print("Running single test...")
@@ -422,14 +435,15 @@ def main():
             final_symbols = target_symbols if target_symbols else (interactive_symbols if interactive_symbols else None)
             
             if choice in ['c', 'continuous']:
-                run_continuous(interval_seconds, interval_display, final_symbols)
+                run_continuous(interval_seconds, final_symbols)
             elif choice in ['p', 'preview']:
                 preview_stream_mappings(final_symbols)
             else:
                 run_once(final_symbols)
-        else:
-            # Run continuous with specified options
-            run_continuous(interval_seconds, interval_display, target_symbols if target_symbols else None)
+
+                # Run continuous with specified options
+                run_continuous(interval_seconds, target_symbols if target_symbols else None)
+
 
 if __name__ == "__main__":
     main()
