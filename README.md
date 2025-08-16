@@ -23,6 +23,11 @@ A Python script to send cryptocurrency price data to the **[Cycles App](https://
 
 ##  Usage
 
+### Preview what stream IDs will be generated (recommended first)
+```bash
+python crypto_cycles.py --preview
+```
+
 ### Continuous Monitoring
 ```bash
 python crypto_cycles.py

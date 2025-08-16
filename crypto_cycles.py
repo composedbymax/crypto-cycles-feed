@@ -16,19 +16,10 @@ CYCLES_API_KEY = "REDACTED"  # Replace with your actual API key
 CYCLES_WEBHOOK_URL = "https://api.cycle.tools/api/Stream/SubmitStreamData"
 COINGECKO_API_URL = "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=10&page=1&sparkline=false"
 
-# Cryptocurrency stream IDs - customize as needed
-CRYPTO_STREAMS = {
-    "bitcoin": "BTC_PRICE",
-    "ethereum": "ETH_PRICE", 
-    "binancecoin": "BNB_PRICE",
-    "solana": "SOL_PRICE",
-    "cardano": "ADA_PRICE",
-    "avalanche-2": "AVAX_PRICE",
-    "chainlink": "LINK_PRICE",
-    "polygon": "MATIC_PRICE",
-    "litecoin": "LTC_PRICE",
-    "polkadot": "DOT_PRICE"
-}
+def generate_stream_id(symbol, name):
+    """Generate a stream ID from symbol and name"""
+    # Convert symbol to uppercase and append _PRICE
+    return f"{symbol.upper()}_PRICE"
 
 def fetch_crypto_prices():
     """Fetch cryptocurrency prices from CoinGecko API"""
@@ -94,30 +85,60 @@ def process_crypto_data():
     success_count = 0
     total_count = 0
     
+    print(f"Found {len(crypto_data)} cryptocurrencies from API")
+    
     for crypto in crypto_data:
         crypto_id = crypto.get('id')
+        symbol = crypto.get('symbol')
+        name = crypto.get('name')
         current_price = crypto.get('current_price')
         
-        if crypto_id in CRYPTO_STREAMS and current_price:
-            stream_id = CRYPTO_STREAMS[crypto_id]
+        if symbol and current_price and name:
+            # Generate stream ID automatically
+            stream_id = generate_stream_id(symbol, name)
             total_count += 1
+            
+            print(f"Processing {name} ({symbol.upper()}) -> {stream_id}")
             
             if send_to_cycles(stream_id, current_price, timestamp):
                 success_count += 1
+        else:
+            print(f"Skipping {crypto_id}: missing required fields")
     
     print(f"Processed {success_count}/{total_count} cryptocurrencies successfully")
     return success_count > 0
 
 def validate_config():
     """Validate configuration before running"""
-    if CYCLES_API_KEY == "YOUR-API-KEY":
+    if CYCLES_API_KEY == "REDACTED":
         print("Please update CYCLES_API_KEY with your actual API key")
         return False
     
     print(f"✓ Configuration validated")
-    print(f"✓ Will track {len(CRYPTO_STREAMS)} cryptocurrencies")
     print(f"✓ Using Cycles API key: {CYCLES_API_KEY[:8]}...")
     return True
+
+def preview_stream_mappings():
+    """Preview what stream IDs will be generated without sending data"""
+    print("Previewing stream mappings...")
+    
+    crypto_data = fetch_crypto_prices()
+    if not crypto_data:
+        return
+    
+    print(f"\nWill create the following stream mappings:")
+    print("-" * 60)
+    
+    for crypto in crypto_data:
+        symbol = crypto.get('symbol')
+        name = crypto.get('name')
+        current_price = crypto.get('current_price')
+        
+        if symbol and name and current_price:
+            stream_id = generate_stream_id(symbol, name)
+            print(f"{name:<20} ({symbol.upper():<6}) -> {stream_id:<15} (${current_price:,.2f})")
+    
+    print("-" * 60)
 
 def run_continuous():
     """Run the app continuously with rate limiting"""
@@ -178,16 +199,24 @@ def main():
     print("  CRYPTOCURRENCY PRICE TO CYCLES APP")
     print("=" * 50)
     
-    if len(sys.argv) > 1 and sys.argv[1] == "--test":
-        run_once()
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "--test":
+            run_once()
+        elif sys.argv[1] == "--preview":
+            preview_stream_mappings()
+        else:
+            print("Unknown argument. Use --test or --preview")
     else:
         print("\nModes:")
-        print("  python crypto_cycles.py         - Run continuously")
-        print("  python crypto_cycles.py --test  - Run once for testing")
+        print("  python crypto_cycles.py           - Run continuously")
+        print("  python crypto_cycles.py --test    - Run once for testing")
+        print("  python crypto_cycles.py --preview - Preview stream mappings")
         
-        choice = input("\nRun continuously? (y/n): ").strip().lower()
-        if choice in ['y', 'yes']:
+        choice = input("\nChoose mode (c)ontinuous/(t)est/(p)review: ").strip().lower()
+        if choice in ['c', 'continuous']:
             run_continuous()
+        elif choice in ['p', 'preview']:
+            preview_stream_mappings()
         else:
             run_once()
 
