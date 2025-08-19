@@ -5,4 +5,4 @@ Desktop.ini
 $RECYCLE.BIN/
 *.stackdump
 Icon?
-.env
+**/.env

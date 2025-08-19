@@ -1,95 +1,58 @@
-# Crypto Cycles Feed
+# Cycles API Developer Documentation
 
-A Python script to send cryptocurrency price data to the **[Cycles App](https://app.cycles.org)** from [CoinGecko](https://www.coingecko.com/en/api), supporting both continuous monitoring and single-test modes.
+## Quick Start
 
----
+The Cycles API allows you to stream real-time data to your Cycles app dashboard. Send time-series data via simple HTTP POST requests.
 
-## Setup
+## Basic Usage
 
-1. **Setup Script**  
+### HTTP Request
+```http
+POST https://api.cycle.tools/api/Stream/SubmitStreamData?api_key=YOUR-API-KEY
 
-    Save code and enviorment file as:  
-    ```bash
-    crypto_cycles.py
-    .env
-    ```
+Content-Type: application/json
 
-2. **Configure Your API Key**  
-
-    Open `.env` and provide key such as:  
-    ```python
-    CYCLES_API_KEY=your-actual-api-key-here
-    ```
-
----
-
-## Usage
-
-### Command Line Options
-
-```bash
-# Basic modes
-python crypto_cycles.py                         # START
-python crypto_cycles.py --5m                    # Run every 5 minutes (all symbols)
-python crypto_cycles.py --1h                    # Run every 1 hour (all symbols)
-python crypto_cycles.py --test                  # Run once for testing (all symbols)
-python crypto_cycles.py --preview               # Preview stream mappings (all symbols)
-
-# Single symbol modes
-python crypto_cycles.py --symbol BTC            # Run continuously (BTC only)
-python crypto_cycles.py --test --symbol BTC     # Test run (BTC only)
-python crypto_cycles.py --preview --symbol BTC  # Preview BTC mapping
-python crypto_cycles.py --5m -s ETH             # Run every 5 minutes (ETH only)
-
-# Multiple symbol modes
-python crypto_cycles.py --symbols BTC,ETH,ADA   # Run continuously (specific symbols)
-python crypto_cycles.py --symbols=BTC,ETH,SOL   # Run continuously (inline format)
-python crypto_cycles.py --test --symbols BTC,ETH # Test run (specific symbols)
+{
+  "streamid": "YOUR-STREAM-ID",
+  "messagetype": "UPSERT",
+  "dates": ["2024-01-15T10:30:00Z"],
+  "values": [42.50]
+}
 ```
 
-### Symbol Options
+### Request Parameters
 
-- `--symbol BTC` - Single symbol
-- `--symbol=BTC` - Single symbol (inline format)
-- `--symbols BTC,ETH,ADA` - Multiple symbols (comma-separated)
-- `--symbols=BTC,ETH,ADA` - Multiple symbols (inline format)
-- `-s BTC` - Single symbol (short form)
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `streamid` | string | Yes | Unique identifier for your data stream, merely for reference |
+| `messagetype` | string | Yes | Always use `"UPSERT"` |
+| `dates` | array | Yes | ISO timestamp in array format |
+| `values` | array | Yes | Numeric value in array format |
 
-### Valid Timeframes
 
-- `--2m` - Every 2 minutes
-- `--5m` - Every 5 minutes
-- `--15m` - Every 15 minutes
-- `--30m` - Every 30 minutes
-- `--1h` - Every 1 hour
-- `--2h` - Every 2 hours
-- `--4h` - Every 4 hours
-- `--6h` - Every 6 hours
-- `--12h` - Every 12 hours
-- `--1d` - Every 1 day
+## Best Practices
 
-### Interactive Mode
+### Timeframe Limits
+- **Minimum timeframe**: 1 minute intervals
 
-When run without arguments, the script will prompt you to choose a mode:
-- **(c)ontinuous** - Run continuously with specified interval
-- **(t)est** - Run once for testing
-- **(p)review** - Preview stream mappings without sending data
+### Stream Limits
+- **Analyst Pro**: 10 streams by default
+- Use descriptive stream IDs for organization
 
-### Examples
+### Best Practices
+1. **Handle errors gracefully** with retry logic
+2. **Use consistent timestamps** in ISO format
+3. **Monitor your stream count** to stay within limits
+4. **Use meaningful stream IDs** for dashboard organization
+5. **Respect data exchange rate limits** to ensure reliable data delivery
 
-```bash
-# Monitor all cryptocurrencies continuously
-python crypto_cycles.py
 
-# Check Bitcoin price every 15 minutes
-python crypto_cycles.py --15m --symbol BTC
+## Getting Your API Key
 
-# Test run for Ethereum and Solana only
-python crypto_cycles.py --test --symbols ETH,SOL
+1. Log into your Cycles account
+2. Navigate to [/account/api](https://app.cycles.org/account/api)
+3. Generate or copy your API key
 
-# Preview what symbols would be monitored
-python crypto_cycles.py --preview --symbols BTC,ETH,ADA,DOT
+## Examples
 
-# Monitor top 3 cryptocurrencies every hour
-python crypto_cycles.py --1h --symbols BTC,ETH,BNB
-```
+- [python](https://github.com/composedbymax/crypto-cycles-feed/tree/main/py-script)

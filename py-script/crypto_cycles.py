@@ -15,6 +15,7 @@ import re
 
 
 # Simple API key loader from .env file (no extra libraries)
+# or delete from None - add it to .env") and replace with hardcoded api key in ""
 CYCLES_API_KEY = None
 
 try:
